@@ -17,3 +17,5 @@ if __name__ == "__main__":
             
             default_corpus[pid] = passage
 
+    default_corpus.close() 
+

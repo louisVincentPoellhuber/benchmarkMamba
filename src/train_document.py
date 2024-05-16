@@ -398,3 +398,5 @@ if __name__ == "__main__":
                     for i in range(len(doc_ids)):
                         tsv_writer.writerow([k, "Q0", v[sorted_idxes[i]], str(i+1), str(scores[sorted_idxes[i]]), "Reranking"])
             fout.close()
+    
+    collection.close() 
