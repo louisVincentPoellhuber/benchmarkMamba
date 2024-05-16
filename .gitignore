@@ -172,3 +172,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 cuda-repo-wsl-ubuntu-12-4-local_12.4.1-1_amd64.deb
+/runs

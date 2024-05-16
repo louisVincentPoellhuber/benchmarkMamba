@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "benchmarkMamba Debug",
+            "name": "benchmarkMamba train test",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -15,7 +15,15 @@
                 "--tokenizer",
                 "state-spaces/mamba-130m-hf",
                 "--input_dir",
-                "data/"
+                "data/",
+                "--triples",
+                "train_samples_lce_2x.tsv",
+                "--train_batch_size",
+                "8",
+                "--epochs",
+                "1",
+                "--flash_attention",
+                "--do_train"
             ]
         }
     ]
