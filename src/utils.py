@@ -48,8 +48,8 @@ def load_lce_triples(fname):
             res.append(line)
     return res
 
-def get_eval_batch(collection, batch_doc_ids):
-    return [collection[i] for i in batch_doc_ids]
+def get_eval_batch(collection,  p_prefix, batch_doc_ids):
+    return [p_prefix+collection[i] for i in batch_doc_ids]
 
 def read_validset(fname):
     res = []
