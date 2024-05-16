@@ -1,7 +1,8 @@
 ## ANYTHING TO ADD ##
 data/
 *.identifier
-
+/runs
+*.deb
 
 
 
