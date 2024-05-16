@@ -1,5 +1,6 @@
 ## ANYTHING TO ADD ##
 data/
+mamba-env/
 *.identifier
 /runs
 *.deb
@@ -171,3 +172,5 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+cuda-repo-wsl-ubuntu-12-4-local_12.4.1-1_amd64.deb
+/runs

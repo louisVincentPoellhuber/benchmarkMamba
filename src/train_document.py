@@ -24,6 +24,16 @@ from utils import load_lce_triples
 from utils import save_model
 from utils import load_from_trained
 
+from smart_open import open  # for transparently opening remote files
+
+# New stuff
+import shelve
+import dotenv
+import os
+
+dotenv.load_dotenv()
+DATA_PATH = os.getenv("LOCAL_DATA_PATH")
+
 def nested2device(model, device):
     model.base_model = model.base_model.to(device)
     model.regressor = model.regressor.to(device)
@@ -111,13 +121,13 @@ def configure_model_and_tokenizer(model_name_or_path, args=None):
         model.base_model.resize_token_embeddings(len(tokenizer))
     return tokenizer, model
 
-def configure_training_dataset(args, collection, queries, dataset, tokenizer):
+def configure_training_dataset(args, collection, p_prefix, queries, dataset, tokenizer):
     if "t5" in args.model_name_or_path:
-        return LCEDatasetSeq2SeqLM(collection=collection, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
+        return LCEDatasetSeq2SeqLM(collection=collection, p_prefix=p_prefix, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
     elif args.is_autoregressive:
-        return LCEDatasetCausalLM(collection=collection, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
+        return LCEDatasetCausalLM(collection=collection, p_prefix=p_prefix, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
     else:
-        return LCEDatasetMaskedLM(collection=collection, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
+        return LCEDatasetMaskedLM(collection=collection, p_prefix=p_prefix, queries=queries, dataset=lce_dataset, tokenizer=tokenizer, max_length=args.max_length)
 
 
 def get_scheduler(optimizer, scheduler: str, warmup_steps: int, t_total: int):
@@ -234,16 +244,19 @@ def train_classification(
     save_model(model=model, save_dest=save_dest)
     tokenizer.save_pretrained(save_dest)
 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", type=str, required=True)
-    parser.add_argument("--tokenizer", type=str, required=True)
+    parser.add_argument("--model_name_or_path", type=str, required=True, default="state-spaces/mamba-130m-hf")
+    parser.add_argument("--tokenizer", type=str, required=True, default = "state-spaces/mamba-130m-hf")
     parser.add_argument("--t5_encoder", action="store_true", help="specify if using T5EncoderModel")
 
     parser.add_argument("--load_from_trained", action="store_true", help="declare if we load from existing checkpoint")
     parser.add_argument("--model_ckpt", type=str, help="use pytorch.bin if autoregressive model")
 
-    parser.add_argument("--input_dir", type=str, default="/home/zhichao/msmarco_document")
+    print(os.getcwd())
+    parser.add_argument("--input_dir", type=str, default="/data")
     parser.add_argument("--triples", type=str, default="train_samples_lce.tsv")
     parser.add_argument("--lce_size", type=int, default=8)
     parser.add_argument('--experiment_root', type=str, default='./')
@@ -313,12 +326,15 @@ if __name__ == "__main__":
 
     # prepare document collection
     p_prefix, q_prefix = configure_special_tokens(args.model_name_or_path)
-    collection = {}
-    with open(os.path.join(args.input_dir, "collection.tsv"), 'r') as fin:
-        for line in tqdm(fin, desc="loading collection..."):
-            pid, passage = line.strip().split("\t")
-            collection[pid] = p_prefix+passage
-    fin.close()
+    #collection = {}
+    #with open(os.path.join(args.input_dir, "collection.tsv"), 'r') as fin:
+    #    for line in tqdm(fin, desc="loading collection..."):
+    #        pid, passage = line.strip().split("\t")
+    #        collection[pid] = p_prefix+passage
+    #fin.close()
+
+    corpus_path = os.path.join(DATA_PATH, "default_corpus")
+    collection = shelve.open(corpus_path)
 
     if args.do_train:
 
@@ -330,7 +346,7 @@ if __name__ == "__main__":
         fin.close()
 
         lce_dataset = load_lce_triples(os.path.join(args.input_dir, args.triples))
-        trainset = configure_training_dataset(args=args, collection=collection, queries=queries, dataset=lce_dataset, tokenizer=tokenizer)
+        trainset = configure_training_dataset(args=args, collection=collection, p_prefix=p_prefix, queries=queries, dataset=lce_dataset, tokenizer=tokenizer)
         
         train_loader = torch.utils.data.DataLoader(
             trainset, 
@@ -372,7 +388,7 @@ if __name__ == "__main__":
                     num_batch = len(v) // args.eval_batch_size + 1
                     for i in range(num_batch):
                         batch_doc_ids = v[i*args.eval_batch_size: (i+1)*args.eval_batch_size]
-                        batch_docs = get_eval_batch(collection, batch_doc_ids)
+                        batch_docs = get_eval_batch(collection, p_prefix, batch_doc_ids)
 
                         batch_input = [[query, doc] for doc in batch_docs]
                         batch_scores = get_prediction(tokenizer, model, batch_input, args, DEVICE)
