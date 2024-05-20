@@ -175,3 +175,4 @@ cython_debug/
 cuda-repo-wsl-ubuntu-12-4-local_12.4.1-1_amd64.deb
 /runs
 /src/DATASET
+*.deb
