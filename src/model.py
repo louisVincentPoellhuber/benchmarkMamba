@@ -2,6 +2,9 @@ import os
 import sys
 import warnings
 
+import dotenv
+dotenv.load_dotenv()
+
 from typing import Optional, Tuple, Union
 
 import torch

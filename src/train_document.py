@@ -34,6 +34,8 @@ import os
 dotenv.load_dotenv()
 DATA_PATH = os.getenv("LOCAL_DATA_PATH")
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
 def nested2device(model, device):
     model.base_model = model.base_model.to(device)
     model.regressor = model.regressor.to(device)
@@ -196,7 +198,21 @@ def train_classification(
     # check_model_parameters(model)
     model = nested2device(model, device)
     model.train()
-    
+
+    # Profiler
+
+    prof = torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            schedule=torch.profiler.schedule(wait=1, warmup=1, active=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler('/u/poellhul/Documents/Masters/benchmarkMamba/logs/mambaTest'),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+            with_flops=True,
+            with_modules=True
+            )
+    prof.start()
+
     train_steps = 0
     accumulated_loss = 0.
     flag = True
@@ -230,6 +246,9 @@ def train_classification(
                 scaler.update()
                 scheduler.step()
                 optimizer.zero_grad()  # zero out the accumulated optimizer grad
+                
+                prof.step()
+
                 if (train_steps) % 100 == 0:
                     print(f"\naverage loss -> {accumulated_loss/(train_steps):.2f}")
 
@@ -239,6 +258,9 @@ def train_classification(
                     save_model(model=model, save_dest=save_dest)
                     tokenizer.save_pretrained(save_dest)
     
+    prof.stop()
+    print(prof.key_averages())
+
     save_dest = os.path.join(args.save_dest, f"{model_save_name}_step_{train_steps}")
     print(f"saving to {save_dest}")
     save_model(model=model, save_dest=save_dest)
@@ -315,6 +337,7 @@ if __name__ == "__main__":
         logger.info(f"{k} -> {v}")
 
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print(DEVICE)
 
     tokenizer, model = configure_model_and_tokenizer(model_name_or_path=args.model_name_or_path, args=args)
     print_trainable_parameters(model)

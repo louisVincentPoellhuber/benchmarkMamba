@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "benchmarkMamba train test",
+            "name": "mamba model",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -15,7 +15,7 @@
                 "--tokenizer",
                 "state-spaces/mamba-130m-hf",
                 "--input_dir",
-                "data/",
+                "/part/01/Tmp/benchmarkMamba",
                 "--triples",
                 "train_samples_lce_2x.tsv",
                 "--train_batch_size",
@@ -23,6 +23,49 @@
                 "--epochs",
                 "1",
                 "--flash_attention",
+                "--do_train"
+            ]
+        },
+        {
+            "name": "encoder model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                "--model_name_or_path",
+                "bert-base-uncased",
+                "--tokenizer",
+                "bert-base-uncased",
+                "--input_dir",
+                "/part/01/Tmp/benchmarkMamba",
+                "--triples",
+                "train_samples_lce_2x.tsv",
+                "--train_batch_size",
+                "8",
+                "--epochs",
+                "1",
+                "--flash_attention",
+                "--do_train"
+            ]
+        },
+        {
+            "name": "encoder-decoder model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                "--model_name_or_path",
+                "facebook/opt-125m",
+                "--tokenizer",
+                "facebook/opt-125m",
+                "--input_dir",
+                "/part/01/Tmp/benchmarkMamba",
+                "--triples",
+                "train_samples_lce_2x.tsv",
+                "--train_batch_size",
+                "8",
+                "--epochs",
+                "1",
                 "--do_train"
             ]
         }
