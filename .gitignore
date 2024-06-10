@@ -2,7 +2,8 @@
 data/
 mamba-env/
 *.identifier
-/runs
+/src/runs
+/src/wandb
 *.deb
 *.conda
 /logs

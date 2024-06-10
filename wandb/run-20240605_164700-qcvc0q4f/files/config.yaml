@@ -1,0 +1,139 @@
+wandb_version: 1
+
+model_name_or_path:
+  desc: null
+  value: bert-base-uncased
+tokenizer:
+  desc: null
+  value: bert-base-uncased
+t5_encoder:
+  desc: null
+  value: false
+load_from_trained:
+  desc: null
+  value: false
+model_ckpt:
+  desc: null
+  value: null
+input_dir:
+  desc: null
+  value: /part/01/Tmp/benchmarkMamba
+triples:
+  desc: null
+  value: train_samples_lce_2x.tsv
+lce_size:
+  desc: null
+  value: 8
+experiment_root:
+  desc: null
+  value: ./
+num_labels:
+  desc: null
+  value: 1
+pooling_method:
+  desc: null
+  value: eos-pooling
+flash_attention:
+  desc: null
+  value: true
+lora:
+  desc: null
+  value: false
+lora_r:
+  desc: null
+  value: 64
+lora_alpha:
+  desc: null
+  value: 128
+train_batch_size:
+  desc: null
+  value: 8
+epochs:
+  desc: null
+  value: 1
+training_steps:
+  desc: null
+  value: 10000000000.0
+fp16:
+  desc: null
+  value: false
+max_length:
+  desc: null
+  value: 512
+lr:
+  desc: null
+  value: 2.0e-05
+weight_decay:
+  desc: null
+  value: 0.01
+disable_bias:
+  desc: null
+  value: false
+scheduler:
+  desc: null
+  value: warmuplinear
+warmup_steps:
+  desc: null
+  value: 1000.0
+warmup_ratio:
+  desc: null
+  value: 0.1
+do_train:
+  desc: null
+  value: true
+do_eval:
+  desc: null
+  value: false
+disable_tqdm:
+  desc: null
+  value: false
+eval_dataset:
+  desc: null
+  value: null
+eval_batch_size:
+  desc: null
+  value: 128
+ranklist:
+  desc: null
+  value: firstp.run
+logger:
+  desc: null
+  value: default_logging.log
+save_dest:
+  desc: null
+  value: ./ckpt
+is_autoregressive:
+  desc: null
+  value: false
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.9
+    cli_version: 0.17.0
+    framework: huggingface
+    huggingface_version: 4.41.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1717620420
+    t:
+      1:
+      - 1
+      - 11
+      - 43
+      - 49
+      - 55
+      2:
+      - 1
+      - 11
+      - 43
+      - 49
+      - 55
+      3:
+      - 16
+      - 23
+      4: 3.11.9
+      5: 0.17.0
+      6: 4.41.0
+      8:
+      - 5
+      13: linux-x86_64

@@ -1,0 +1,38 @@
+06/03/2024 17:04:56 - INFO - __main__ - 
+
+
+06/03/2024 17:04:56 - INFO - __main__ - model_name_or_path -> bert-base-uncased
+06/03/2024 17:04:56 - INFO - __main__ - tokenizer -> bert-base-uncased
+06/03/2024 17:04:56 - INFO - __main__ - t5_encoder -> False
+06/03/2024 17:04:56 - INFO - __main__ - load_from_trained -> False
+06/03/2024 17:04:56 - INFO - __main__ - model_ckpt -> None
+06/03/2024 17:04:56 - INFO - __main__ - input_dir -> /part/01/Tmp/benchmarkMamba
+06/03/2024 17:04:56 - INFO - __main__ - triples -> train_samples_lce_2x.tsv
+06/03/2024 17:04:56 - INFO - __main__ - lce_size -> 8
+06/03/2024 17:04:56 - INFO - __main__ - experiment_root -> ./
+06/03/2024 17:04:56 - INFO - __main__ - num_labels -> 1
+06/03/2024 17:04:56 - INFO - __main__ - pooling_method -> eos-pooling
+06/03/2024 17:04:56 - INFO - __main__ - flash_attention -> True
+06/03/2024 17:04:56 - INFO - __main__ - lora -> False
+06/03/2024 17:04:56 - INFO - __main__ - lora_r -> 64
+06/03/2024 17:04:56 - INFO - __main__ - lora_alpha -> 128
+06/03/2024 17:04:56 - INFO - __main__ - train_batch_size -> 8
+06/03/2024 17:04:56 - INFO - __main__ - epochs -> 1
+06/03/2024 17:04:56 - INFO - __main__ - training_steps -> 10000000000.0
+06/03/2024 17:04:56 - INFO - __main__ - fp16 -> False
+06/03/2024 17:04:56 - INFO - __main__ - max_length -> 512
+06/03/2024 17:04:56 - INFO - __main__ - lr -> 2e-05
+06/03/2024 17:04:56 - INFO - __main__ - weight_decay -> 0.01
+06/03/2024 17:04:56 - INFO - __main__ - disable_bias -> False
+06/03/2024 17:04:56 - INFO - __main__ - scheduler -> warmuplinear
+06/03/2024 17:04:56 - INFO - __main__ - warmup_steps -> 1000.0
+06/03/2024 17:04:56 - INFO - __main__ - warmup_ratio -> 0.1
+06/03/2024 17:04:56 - INFO - __main__ - do_train -> True
+06/03/2024 17:04:56 - INFO - __main__ - do_eval -> False
+06/03/2024 17:04:56 - INFO - __main__ - disable_tqdm -> False
+06/03/2024 17:04:56 - INFO - __main__ - eval_dataset -> None
+06/03/2024 17:04:56 - INFO - __main__ - eval_batch_size -> 128
+06/03/2024 17:04:56 - INFO - __main__ - ranklist -> firstp.run
+06/03/2024 17:04:56 - INFO - __main__ - logger -> tensorboard
+06/03/2024 17:04:56 - INFO - __main__ - save_dest -> ./ckpt
+06/03/2024 17:04:56 - INFO - __main__ - is_autoregressive -> False

@@ -1,0 +1,143 @@
+{
+    "os": "Linux-6.6.28-gentoo-dist-x86_64-AMD_Ryzen_7_7700X_8-Core_Processor-with-glibc2.39",
+    "python": "3.11.9",
+    "heartbeatAt": "2024-06-05T20:06:15.119282",
+    "startedAt": "2024-06-05T20:06:14.356409",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--model_name_or_path",
+        "bert-base-uncased",
+        "--tokenizer",
+        "bert-base-uncased",
+        "--input_dir",
+        "/part/01/Tmp/benchmarkMamba",
+        "--triples",
+        "train_samples_lce_2x.tsv",
+        "--train_batch_size",
+        "8",
+        "--epochs",
+        "1",
+        "--flash_attention",
+        "--do_train"
+    ],
+    "state": "running",
+    "program": "/u/poellhul/Documents/Masters/benchmarkMamba/src/train_document.py",
+    "codePathLocal": "src/train_document.py",
+    "codePath": "src/train_document.py",
+    "git": {
+        "remote": "https://github.com/louisVincentPoellhuber/benchmarkMamba.git",
+        "commit": "c9c377774e05f69921eb6be31259a7a904bfa689"
+    },
+    "email": "louis4438@gmail.com",
+    "root": "/u/poellhul/Documents/Masters/benchmarkMamba",
+    "host": "octal33",
+    "username": "poellhul",
+    "executable": "/part/01/Tmp/benchmarkMamba/benchmarkMamba-env/envs/benchmarkMamba/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 4086.0905,
+        "min": 400.0,
+        "max": 5573.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 4652.85,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3271.683,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3519.096,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 4293.949,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3224.869,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3444.453,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 4572.697,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3301.719,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 4131.544,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3756.672,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3292.999,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3511.127,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3329.263,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 4741.12,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 4627.085,
+            "min": 400.0,
+            "max": 5573.0
+        },
+        {
+            "current": 3520.165,
+            "min": 400.0,
+            "max": 5573.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 929.4661293029785,
+            "used": 46.807918548583984
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 4090",
+            "memory_total": 25757220864
+        }
+    ],
+    "memory": {
+        "total": 124.92601776123047
+    }
+}

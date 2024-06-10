@@ -30,11 +30,15 @@ from smart_open import open  # for transparently opening remote files
 import shelve
 import dotenv
 import os
+import glob
+import time
+import shutil
 
 dotenv.load_dotenv()
 DATA_PATH = os.getenv("LOCAL_DATA_PATH")
 
-from torch.profiler import profile, record_function, ProfilerActivity
+from torch.profiler import profile, record_function#, KinetoEvent, schedule
+import wandb
 
 def nested2device(model, device):
     model.base_model = model.base_model.to(device)
@@ -185,6 +189,9 @@ def train_classification(
     args,
     logger=None
     ):
+
+
+    train_start = time.perf_counter()
     total_training_steps = min(args.training_steps, len(train_loader)*args.epochs)
     print(f"total training steps -> {total_training_steps}")
     save_milestone = total_training_steps // 10
@@ -193,75 +200,94 @@ def train_classification(
     scheduler = get_scheduler(optimizer, args.scheduler, args.warmup_steps, total_training_steps)
 
     loss_fct = torch.nn.CrossEntropyLoss()
-    writer = SummaryWriter()
+    #writer = SummaryWriter()    
+
+    # WandB stuff
+    wandb.login(key=os.getenv("WANDB_KEY"))
+    run = wandb.init(
+        project = "mambaTest",
+        config = vars(args)
+    )
 
     # check_model_parameters(model)
     model = nested2device(model, device)
     model.train()
 
+    def train_loop(profiler):
+        train_steps = 0
+        accumulated_loss = 0.
+        flag = True
+        while flag:
+            for epoch_id in range(args.epochs):
+                if "t5" in model.config._name_or_path or "opt" in model.config._name_or_path or "pythia" in model.config._name_or_path:
+                    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
+                    autocast_dtype = torch.bfloat16
+                else:
+                    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
+                    autocast_dtype = torch.float16
+                for train_steps, batch in tqdm(enumerate(train_loader), desc=f"training epoch {epoch_id+1}", disable=args.disable_tqdm, total=len(train_loader)):
+                    it_start = time.perf_counter()
+                    if train_steps > total_training_steps:
+                        flag = False
+                        break
+                    with torch.cuda.amp.autocast(dtype=autocast_dtype, enabled=args.fp16):
+                        output = model(
+                            input_ids=batch.input_ids.to(device),
+                            attention_mask=batch.attention_mask.to(device),
+                        )
+
+                        logits = output.view(-1, args.lce_size)  # by default this is set to 8, but can be changed to 16 as well
+                        labels = torch.LongTensor([0]*logits.shape[0]).to(logits.device)  # (bz)
+                        loss = loss_fct(logits, labels)
+                    
+                    #writer.add_scalar("step loss", loss.item(), train_steps)
+                    accumulated_loss += loss.item()
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                    scheduler.step()
+                    optimizer.zero_grad()  # zero out the accumulated optimizer grad
+                    profiler.step() 
+                    
+                    wandb.log({"loss": loss, "iter_time": time.perf_counter()-it_start, "total_time": time.perf_counter()-train_start})
+        
+                    if (train_steps % 100 == 0) & (train_steps > 0):
+                        avg_loss = accumulated_loss/(train_steps)
+                        wandb.log({"avg_loss": avg_loss})
+
+                    if (train_steps % save_milestone == 0) & (train_steps > 0):
+                        save_dest = os.path.join(args.save_dest, f'{model_save_name}_step_{train_steps}')
+                        print(f"saving to {save_dest}")
+                        save_model(model=model, save_dest=save_dest)
+                        tokenizer.save_pretrained(save_dest)
+
     # Profiler
+    profile_dir = '/u/poellhul/Documents/Masters/benchmarkMamba/logs/test'
+    wait = 100
+    warmup = 10
+    active = 50
+    repeat = 1950
+    prof_schedule = torch.profiler.schedule(
+        wait=wait,       # Skip the first step
+        warmup=warmup,     # Warm-up for the second step
+        active=active,     # Profile for the next three steps
+        repeat=repeat          # Repeat this cycle twice
+    )
 
-    prof = torch.profiler.profile(
+    profiler = profile(
             activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-            schedule=torch.profiler.schedule(wait=1, warmup=1, active=1),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler('/u/poellhul/Documents/Masters/benchmarkMamba/logs/mambaTest'),
-            record_shapes=True,
-            profile_memory=True,
+            schedule=prof_schedule,
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(profile_dir, worker_name="louis"),
             with_stack=True,
-            with_flops=True,
-            with_modules=True
             )
-    prof.start()
-
-    train_steps = 0
-    accumulated_loss = 0.
-    flag = True
-    while flag:
-        for epoch_id in range(args.epochs):
-            if "t5" in model.config._name_or_path or "opt" in model.config._name_or_path or "pythia" in model.config._name_or_path:
-                scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
-                autocast_dtype = torch.bfloat16
-            else:
-                scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
-                autocast_dtype = torch.float16
-            for batch_idx, batch in tqdm(enumerate(train_loader), desc=f"training epoch {epoch_id+1}", disable=args.disable_tqdm):
-                if train_steps > total_training_steps:
-                    flag = False
-                    break
-                with torch.cuda.amp.autocast(dtype=autocast_dtype, enabled=args.fp16):
-                    output = model(
-                        input_ids=batch.input_ids.to(device),
-                        attention_mask=batch.attention_mask.to(device),
-                    )
-
-                    logits = output.view(-1, args.lce_size)  # by default this is set to 8, but can be changed to 16 as well
-                    labels = torch.LongTensor([0]*logits.shape[0]).to(logits.device)  # (bz)
-                    loss = loss_fct(logits, labels)
-                
-                writer.add_scalar("step loss", loss.item(), train_steps)
-                accumulated_loss += loss.item()
-                train_steps += 1
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-                scheduler.step()
-                optimizer.zero_grad()  # zero out the accumulated optimizer grad
-                
-                prof.step()
-
-                if (train_steps) % 100 == 0:
-                    print(f"\naverage loss -> {accumulated_loss/(train_steps):.2f}")
-
-                if train_steps % save_milestone == 0:
-                    save_dest = os.path.join(args.save_dest, f'{model_save_name}_step_{train_steps}')
-                    print(f"saving to {save_dest}")
-                    save_model(model=model, save_dest=save_dest)
-                    tokenizer.save_pretrained(save_dest)
     
-    prof.stop()
-    print(prof.key_averages())
-
-    save_dest = os.path.join(args.save_dest, f"{model_save_name}_step_{train_steps}")
+    if args.profiler:
+        with profiler:
+            train_loop(profiler)
+    else:
+        train_loop()
+    
+    save_dest = os.path.join(args.save_dest, f"{model_save_name}_step_final")
     print(f"saving to {save_dest}")
     save_model(model=model, save_dest=save_dest)
     tokenizer.save_pretrained(save_dest)
@@ -316,6 +342,9 @@ if __name__ == "__main__":
     parser.add_argument('--ranklist', type=str, default='firstp.run')
 
     parser.add_argument('--logger', type=str, default="default_logging.log")
+
+    parser.add_argument('--profiler', type=bool, default=True)
+
 
     args = parser.parse_args()
     args.save_dest = os.path.join(args.experiment_root, "ckpt")
