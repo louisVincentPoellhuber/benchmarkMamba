@@ -5,8 +5,6 @@ import csv
 import argparse
 import logging
 
-import gc
-
 from tqdm import tqdm
 import numpy as np
 
@@ -35,6 +33,48 @@ import os
 
 dotenv.load_dotenv()
 DATA_PATH = os.getenv("LOCAL_DATA_PATH")
+
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+import argparse
+
+def init_distributed_mode(args):
+    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        args.rank = int(os.environ['RANK'])
+        args.world_size = int(os.environ['WORLD_SIZE'])
+        args.gpu = int(os.environ['LOCAL_RANK'])
+    elif 'SLURM_PROCID' in os.environ:
+        args.rank = int(os.environ['SLURM_PROCID'])
+        args.gpu = args.rank % torch.cuda.device_count()
+    else:
+        print('Not using distributed mode')
+        args.distributed = False
+        return
+
+    args.distributed = True
+
+    torch.cuda.set_device(args.gpu)
+    args.dist_backend = 'nccl'
+    print('| distributed init (rank {}): {}'.format(
+        args.rank, args.dist_url), flush=True)
+    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                            world_size=args.world_size, rank=args.rank)
+    dist.barrier()
+    setup_for_distributed(args.rank == 0)
+
+def setup_for_distributed(is_master):
+    """
+    This function disables printing when not in master process
+    """
+    import builtins as __builtin__
+    builtin_print = __builtin__.print
+
+    def print(*args, **kwargs):
+        force = kwargs.pop('force', False)
+        if is_master or force:
+            builtin_print(*args, **kwargs)
+    __builtin__.print = print
 
 def nested2device(model, device):
     model.base_model = model.base_model.to(device)
@@ -184,7 +224,11 @@ def train_classification(
     optimizer, 
     args,
     logger=None
-    ):
+):
+    if args.distributed:
+        model = nested2device(model, device)
+        model = DDP(model, device_ids=[args.gpu], output_device=args.gpu)
+    
     total_training_steps = min(args.training_steps, len(train_loader)*args.epochs)
     print(f"total training steps -> {total_training_steps}")
     save_milestone = total_training_steps // 10
@@ -195,21 +239,21 @@ def train_classification(
     loss_fct = torch.nn.CrossEntropyLoss()
     writer = SummaryWriter()
 
-    # check_model_parameters(model)
-    model = nested2device(model, device)
     model.train()
     
     train_steps = 0
     accumulated_loss = 0.
     flag = True
+    
+    if "t5" in model.config._name_or_path or "opt" in model.config._name_or_path or "pythia" in model.config._name_or_path:
+        scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
+        autocast_dtype = torch.bfloat16
+    else:
+        scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
+        autocast_dtype = torch.float16
+
     while flag:
         for epoch_id in range(args.epochs):
-            if "t5" in model.config._name_or_path or "opt" in model.config._name_or_path or "pythia" in model.config._name_or_path:
-                scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
-                autocast_dtype = torch.bfloat16
-            else:
-                scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
-                autocast_dtype = torch.float16
             for batch_idx, batch in tqdm(enumerate(train_loader), desc=f"training epoch {epoch_id+1}", disable=args.disable_tqdm):
                 if train_steps > total_training_steps:
                     flag = False
@@ -220,42 +264,39 @@ def train_classification(
                         attention_mask=batch.attention_mask.to(device),
                     )
 
-                    logits = output.view(-1, args.lce_size)  # by default this is set to 8, but can be changed to 16 as well
+                    logits = output.view(-1, args.lce_size)
                     labels = torch.LongTensor([0]*logits.shape[0]).to(logits.device)  # (bz)
                     loss = loss_fct(logits, labels)
-                
+            
                 writer.add_scalar("step loss", loss.item(), train_steps)
                 accumulated_loss += loss.item()
                 train_steps += 1
+
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
-
-                optimizer.zero_grad()  # zero out the accumulated optimizer grad
-                
+                optimizer.zero_grad() 
                 scaler.update()
                 scheduler.step()
-                
+            
                 if (train_steps) % 100 == 0:
                     print(f"\naverage loss -> {accumulated_loss/(train_steps):.2f}")
 
                 if train_steps % save_milestone == 0:
-                    save_dest = os.path.join(args.save_dest, f'{model_save_name}_step_{train_steps}')
-                    print(f"saving to {save_dest}")
-                    save_model(model=model, save_dest=save_dest)
-                    tokenizer.save_pretrained(save_dest)
-
-                    torch.cuda.empty_cache()
-                    gc.collect()
+                    if args.rank == 0: 
+                        save_dest = os.path.join(args.save_dest, f'{model_save_name}_step_{train_steps}')
+                        print(f"saving to {save_dest}")
+                        save_model(model=model, save_dest=save_dest)
+                        tokenizer.save_pretrained(save_dest)
+                        torch.cuda.empty_cache() 
+                        gc.collect() 
     
-    save_dest = os.path.join(args.save_dest, f"{model_save_name}_step_{train_steps}")
-    print(f"saving to {save_dest}")
-    save_model(model=model, save_dest=save_dest)
-    tokenizer.save_pretrained(save_dest)
-
-    torch.cuda.empty_cache()
-    gc.collect()
-
-
+    if args.rank == 0:  
+        save_dest = os.path.join(args.save_dest, f"{model_save_name}_step_{train_steps}")
+        print(f"saving to {save_dest}")
+        save_model(model=model, save_dest=save_dest)
+        tokenizer.save_pretrained(save_dest)
+        torch.cuda.empty_cache()
+        gc.collect() 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -266,6 +307,7 @@ if __name__ == "__main__":
     parser.add_argument("--load_from_trained", action="store_true", help="declare if we load from existing checkpoint")
     parser.add_argument("--model_ckpt", type=str, help="use pytorch.bin if autoregressive model")
 
+    print(os.getcwd())
     parser.add_argument("--input_dir", type=str, default="/part/01/Tmp/benchmarkMamba/DATASET")
     parser.add_argument("--triples", type=str, default="train_samples_lce.tsv")
     parser.add_argument("--lce_size", type=int, default=8)
@@ -305,13 +347,16 @@ if __name__ == "__main__":
 
     parser.add_argument('--logger', type=str, default="default_logging.log")
 
+    parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
+
     args = parser.parse_args()
-    # args.save_dest = os.path.join(args.experiment_root, "ckpt")
-    args.save_dest = "ckpt"
+    args.save_dest = os.path.join(args.experiment_root, "ckpt")
     if "opt" in args.model_name_or_path.lower() or "pythia" in args.model_name_or_path.lower() or "mamba" in args.model_name_or_path.lower() or "gpt2" in args.model_name_or_path:
         args.is_autoregressive = True
     else:
         args.is_autoregressive = False
+
+    init_distributed_mode(args)    
 
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
@@ -319,14 +364,16 @@ if __name__ == "__main__":
         level=logging.INFO,
         filename=args.logger, 
         filemode='a',
-        )
+    )
     logger = logging.getLogger(__name__)
     logger.info("\n\n")
     for k, v in vars(args).items():
         logger.info(f"{k} -> {v}")
 
     DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-    print(f"using device -> {DEVICE}")
+    # DEVICE = "cpu"
+
+    print(DEVICE)
 
     tokenizer, model = configure_model_and_tokenizer(model_name_or_path=args.model_name_or_path, args=args)
     print_trainable_parameters(model)
@@ -338,12 +385,6 @@ if __name__ == "__main__":
 
     # prepare document collection
     p_prefix, q_prefix = configure_special_tokens(args.model_name_or_path)
-    #collection = {}
-    #with open(os.path.join(args.input_dir, "collection.tsv"), 'r') as fin:
-    #    for line in tqdm(fin, desc="loading collection..."):
-    #        pid, passage = line.strip().split("\t")
-    #        collection[pid] = p_prefix+passage
-    #fin.close()
 
     corpus_path = os.path.join(DATA_PATH, "default_corpus")
     collection = shelve.open(corpus_path)
@@ -359,19 +400,23 @@ if __name__ == "__main__":
 
         lce_dataset = load_lce_triples(os.path.join(args.input_dir, args.triples))
         trainset = configure_training_dataset(args=args, collection=collection, p_prefix=p_prefix, queries=queries, dataset=lce_dataset, tokenizer=tokenizer)
-        
+
+        from torch.utils.data.distributed import DistributedSampler
+
+        train_sampler = DistributedSampler(trainset) if args.distributed else None
+
         train_loader = torch.utils.data.DataLoader(
             trainset, 
-            shuffle=True, 
+            shuffle=(train_sampler is None), 
             batch_size=args.train_batch_size, 
             collate_fn=trainset.collate_fn,
             num_workers=8,
-            pin_memory=True
+            pin_memory=True,
+            sampler=train_sampler
         )
 
         optimizer = configure_optimizer(model, args.disable_bias, args.lr)
 
-        # start training
         train_classification(
             tokenizer=tokenizer, 
             model=model, 
@@ -380,7 +425,7 @@ if __name__ == "__main__":
             optimizer=optimizer, 
             args=args,
             logger=logger
-            )
+        )
     
     if args.do_eval:
         eval_datasets = args.eval_dataset.split(",")
