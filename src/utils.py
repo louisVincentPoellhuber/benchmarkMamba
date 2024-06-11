@@ -120,7 +120,7 @@ def read_queries(fname, q_prefix="[query]"):
 
 def configure_eval_dataset(name, is_autoregressive=False):
     if name == "dev":
-        input_dir = "/mnt/c/Users/k_iron/desktop/benchmarkMamba/src/DATASET/"
+        input_dir = "/home/zhichao/msmarco_document/"
         test_queries = os.path.join(input_dir, "queries.dev.tsv")
         bm25_ranklist = os.path.join(input_dir, "bm25-ranklist.dev.run")
         ranklist = read_ranklist(bm25_ranklist)
@@ -130,7 +130,7 @@ def configure_eval_dataset(name, is_autoregressive=False):
             test_queries = read_queries(test_queries, "[query]")
 
     elif name == "dl19":
-        input_dir = "/mnt/c/Users/k_iron/desktop/benchmarkMamba/src/DATASET/trec_dl"
+        input_dir = "/home/zhichao/msmarco_document/trec_dl"
         qrels = os.path.join(input_dir, "2019qrels-docs.txt")
         judged = set()
         with open(qrels, "r") as fin:
@@ -147,7 +147,7 @@ def configure_eval_dataset(name, is_autoregressive=False):
         ranklist = read_trec_dl_ranklist(bm25_ranklist)
     
     elif name == "dl20":
-        input_dir = "/mnt/c/Users/k_iron/desktop/benchmarkMamba/src/DATASET/trec_dl"
+        input_dir = "/home/zhichao/msmarco_document/trec_dl"
         qrels = os.path.join(input_dir, "2020qrels-docs.txt")
         judged = set()
         with open(qrels, "r") as fin:

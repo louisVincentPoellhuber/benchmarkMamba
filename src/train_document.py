@@ -255,7 +255,8 @@ if __name__ == "__main__":
     parser.add_argument("--load_from_trained", action="store_true", help="declare if we load from existing checkpoint")
     parser.add_argument("--model_ckpt", type=str, help="use pytorch.bin if autoregressive model")
 
-    parser.add_argument("--input_dir", type=str, default="/mnt/c/Users/k_iron/desktop/benchmarkMamba/src/DATASET")
+    print(os.getcwd())
+    parser.add_argument("--input_dir", type=str, default="/data")
     parser.add_argument("--triples", type=str, default="train_samples_lce.tsv")
     parser.add_argument("--lce_size", type=int, default=8)
     parser.add_argument('--experiment_root', type=str, default='./')
