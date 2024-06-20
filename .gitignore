@@ -2,8 +2,11 @@
 data/
 mamba-env/
 *.identifier
-/runs
+runs/*
 *.deb
+src/wandb/*
+src/ckpt/*
+src/runs/*
 
 
 

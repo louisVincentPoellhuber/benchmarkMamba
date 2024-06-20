@@ -31,7 +31,7 @@ from smart_open import open  # for transparently opening remote files
 # New stuff
 import shelve
 import dotenv
-import os
+import wandb
 
 dotenv.load_dotenv()
 DATA_PATH = os.getenv("LOCAL_DATA_PATH")
@@ -199,6 +199,24 @@ def train_classification(
     model = nested2device(model, device)
     model.train()
     
+    # Initialize W&B
+    model_name = args.model_name_or_path.split('/')[-1]  # 提取模型名称部分
+    project_name = f"DR-{model_name}"
+
+    wandb.init(
+        project=project_name,
+        config={
+            "architecture": args.model_name_or_path,
+            "dataset": "MSMARCO",
+            "epochs": args.epochs,
+            "batch_size": args.train_batch_size,
+            "learning_rate": args.lr,
+            "warmup_steps": args.warmup_steps,
+            "weight_decay": args.weight_decay,
+            "scheduler": args.scheduler,
+        }
+    )
+
     train_steps = 0
     accumulated_loss = 0.
     flag = True
@@ -225,6 +243,7 @@ def train_classification(
                     loss = loss_fct(logits, labels)
                 
                 writer.add_scalar("step loss", loss.item(), train_steps)
+                wandb.log({"step_loss": loss.item()})
                 accumulated_loss += loss.item()
                 train_steps += 1
                 scaler.scale(loss).backward()
@@ -237,12 +256,14 @@ def train_classification(
                 
                 if (train_steps) % 100 == 0:
                     print(f"\naverage loss -> {accumulated_loss/(train_steps):.2f}")
+                    wandb.log({"average_loss": accumulated_loss / train_steps})
 
                 if train_steps % save_milestone == 0:
                     save_dest = os.path.join(args.save_dest, f'{model_save_name}_step_{train_steps}')
                     print(f"saving to {save_dest}")
                     save_model(model=model, save_dest=save_dest)
                     tokenizer.save_pretrained(save_dest)
+                    wandb.save(os.path.join(save_dest, '*'))
 
                     torch.cuda.empty_cache()
                     gc.collect()
@@ -251,6 +272,7 @@ def train_classification(
     print(f"saving to {save_dest}")
     save_model(model=model, save_dest=save_dest)
     tokenizer.save_pretrained(save_dest)
+    wandb.save(os.path.join(save_dest, '*'))
 
     torch.cuda.empty_cache()
     gc.collect()
